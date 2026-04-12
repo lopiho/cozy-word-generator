@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Trash2, ArrowLeft, LogOut, Search, BookOpen, Loader2 } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, LogOut, Search, BookOpen, Loader2, Wand2 } from 'lucide-react';
 import { normalWords, christmasWords } from '@/data/words';
 
 const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
@@ -194,6 +194,42 @@ export default function Admin() {
     }
   };
 
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const handleAiFill = async (count: number = 50) => {
+    if (!selectedDict) return;
+    setAiLoading(true);
+    try {
+      const existingWords = words.map(w => w.word);
+      const res = await supabase.functions.invoke('ai-fill', {
+        body: {
+          password: storedPassword(),
+          dictionaryName: selectedDict.name,
+          count,
+          existingWords,
+        },
+      });
+      if (res.error) throw new Error(res.error.message);
+      if (res.data?.error) throw new Error(res.data.error);
+      const generated: string[] = res.data?.words || [];
+      if (generated.length === 0) {
+        toast.info('AI nevygenerovala žádná nová slova');
+        return;
+      }
+      // Save to DB
+      await adminCall('add_words', storedPassword(), {
+        dictionary_id: selectedDict.id,
+        words: generated,
+      });
+      toast.success(`AI přidala ${generated.length} slov`);
+      loadWords(selectedDict.id);
+    } catch (e: any) {
+      toast.error(e.message || 'Chyba AI');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const filteredWords = words.filter(w =>
     w.word.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -320,6 +356,16 @@ export default function Admin() {
                       ({words.length} slov)
                     </span>
                   </h2>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleAiFill(50)}
+                    disabled={aiLoading}
+                    className="gap-1"
+                  >
+                    {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                    AI plnič
+                  </Button>
                   <Dialog open={showAddWords} onOpenChange={setShowAddWords}>
                     <DialogTrigger asChild>
                       <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Přidat slova</Button>
