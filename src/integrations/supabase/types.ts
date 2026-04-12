@@ -14,7 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      dictionaries: {
+        Row: {
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      words: {
+        Row: {
+          created_at: string
+          dictionary_id: string
+          id: string
+          word: string
+        }
+        Insert: {
+          created_at?: string
+          dictionary_id: string
+          id?: string
+          word: string
+        }
+        Update: {
+          created_at?: string
+          dictionary_id?: string
+          id?: string
+          word?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "words_dictionary_id_fkey"
+            columns: ["dictionary_id"]
+            isOneToOne: false
+            referencedRelation: "dictionaries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
