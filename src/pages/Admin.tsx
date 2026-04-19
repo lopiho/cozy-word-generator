@@ -195,35 +195,51 @@ export default function Admin() {
   };
 
   const [aiLoading, setAiLoading] = useState(false);
+  const [showAiDialog, setShowAiDialog] = useState(false);
+  const [aiCount, setAiCount] = useState(50);
+  const [aiTheme, setAiTheme] = useState('');
+  const [aiDifficulty, setAiDifficulty] = useState<'lehká' | 'střední' | 'těžká'>('střední');
+  const [aiWordType, setAiWordType] = useState<'mix' | 'noun' | 'verb' | 'adj'>('mix');
 
-  const handleAiFill = async (count: number = 50) => {
+  const handleAiFill = async () => {
     if (!selectedDict) return;
     setAiLoading(true);
+    setShowAiDialog(false);
+    const t = toast.loading('AI generuje a validuje slova...');
     try {
       const existingWords = words.map(w => w.word);
       const res = await supabase.functions.invoke('ai-fill', {
         body: {
           password: storedPassword(),
           dictionaryName: selectedDict.name,
-          count,
+          dictionaryDescription: selectedDict.description || '',
+          count: aiCount,
           existingWords,
+          theme: aiTheme.trim(),
+          difficulty: aiDifficulty,
+          wordType: aiWordType,
         },
       });
+      toast.dismiss(t);
       if (res.error) throw new Error(res.error.message);
       if (res.data?.error) throw new Error(res.data.error);
       const generated: string[] = res.data?.words || [];
+      const stats = res.data?.stats;
       if (generated.length === 0) {
         toast.info('AI nevygenerovala žádná nová slova');
         return;
       }
-      // Save to DB
       await adminCall('add_words', storedPassword(), {
         dictionary_id: selectedDict.id,
         words: generated,
       });
-      toast.success(`AI přidala ${generated.length} slov`);
+      toast.success(
+        `AI přidala ${generated.length} slov` +
+        (stats ? ` (z ${stats.generated} kandidátů, ${stats.rejected} odmítnuto)` : '')
+      );
       loadWords(selectedDict.id);
     } catch (e: any) {
+      toast.dismiss(t);
       toast.error(e.message || 'Chyba AI');
     } finally {
       setAiLoading(false);
