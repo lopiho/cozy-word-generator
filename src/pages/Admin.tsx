@@ -195,35 +195,51 @@ export default function Admin() {
   };
 
   const [aiLoading, setAiLoading] = useState(false);
+  const [showAiDialog, setShowAiDialog] = useState(false);
+  const [aiCount, setAiCount] = useState(50);
+  const [aiTheme, setAiTheme] = useState('');
+  const [aiDifficulty, setAiDifficulty] = useState<'lehká' | 'střední' | 'těžká'>('střední');
+  const [aiWordType, setAiWordType] = useState<'mix' | 'noun' | 'verb' | 'adj'>('mix');
 
-  const handleAiFill = async (count: number = 50) => {
+  const handleAiFill = async () => {
     if (!selectedDict) return;
     setAiLoading(true);
+    setShowAiDialog(false);
+    const t = toast.loading('AI generuje a validuje slova...');
     try {
       const existingWords = words.map(w => w.word);
       const res = await supabase.functions.invoke('ai-fill', {
         body: {
           password: storedPassword(),
           dictionaryName: selectedDict.name,
-          count,
+          dictionaryDescription: selectedDict.description || '',
+          count: aiCount,
           existingWords,
+          theme: aiTheme.trim(),
+          difficulty: aiDifficulty,
+          wordType: aiWordType,
         },
       });
+      toast.dismiss(t);
       if (res.error) throw new Error(res.error.message);
       if (res.data?.error) throw new Error(res.data.error);
       const generated: string[] = res.data?.words || [];
+      const stats = res.data?.stats;
       if (generated.length === 0) {
         toast.info('AI nevygenerovala žádná nová slova');
         return;
       }
-      // Save to DB
       await adminCall('add_words', storedPassword(), {
         dictionary_id: selectedDict.id,
         words: generated,
       });
-      toast.success(`AI přidala ${generated.length} slov`);
+      toast.success(
+        `AI přidala ${generated.length} slov` +
+        (stats ? ` (z ${stats.generated} kandidátů, ${stats.rejected} odmítnuto)` : '')
+      );
       loadWords(selectedDict.id);
     } catch (e: any) {
+      toast.dismiss(t);
       toast.error(e.message || 'Chyba AI');
     } finally {
       setAiLoading(false);
@@ -359,13 +375,76 @@ export default function Admin() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleAiFill(50)}
+                    onClick={() => setShowAiDialog(true)}
                     disabled={aiLoading}
                     className="gap-1"
                   >
                     {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                     AI plnič
                   </Button>
+                  <Dialog open={showAiDialog} onOpenChange={setShowAiDialog}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>🪄 AI plnič slov</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Téma (volitelné)</label>
+                          <Input
+                            placeholder="např. zvířata, sport, kuchyně..."
+                            value={aiTheme}
+                            onChange={e => setAiTheme(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">Necháno prázdné = podle názvu slovníku</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Obtížnost</label>
+                            <select
+                              value={aiDifficulty}
+                              onChange={e => setAiDifficulty(e.target.value as any)}
+                              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                            >
+                              <option value="lehká">Lehká</option>
+                              <option value="střední">Střední</option>
+                              <option value="těžká">Těžká</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Typ slov</label>
+                            <select
+                              value={aiWordType}
+                              onChange={e => setAiWordType(e.target.value as any)}
+                              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                            >
+                              <option value="mix">Mix</option>
+                              <option value="noun">Podst. jména</option>
+                              <option value="verb">Slovesa</option>
+                              <option value="adj">Příd. jména</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Počet slov: {aiCount}</label>
+                          <input
+                            type="range"
+                            min={10}
+                            max={150}
+                            step={10}
+                            value={aiCount}
+                            onChange={e => setAiCount(Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
+                          ✨ AI vygeneruje slova a druhým průchodem ověří jejich vhodnost pro Kufr (vyhodí vlastní jména, abstraktní pojmy, špatné tvary).
+                        </div>
+                        <Button onClick={handleAiFill} disabled={aiLoading} className="w-full game-gradient text-primary-foreground">
+                          {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Wand2 className="w-4 h-4 mr-1" /> Spustit generování</>}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   <Dialog open={showAddWords} onOpenChange={setShowAddWords}>
                     <DialogTrigger asChild>
                       <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Přidat slova</Button>
