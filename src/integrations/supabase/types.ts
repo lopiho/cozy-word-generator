@@ -44,6 +44,97 @@ export type Database = {
         }
         Relationships: []
       }
+      game_participants: {
+        Row: {
+          device_id: string
+          id: string
+          joined_at: string
+          role: string
+          room_id: string
+        }
+        Insert: {
+          device_id: string
+          id?: string
+          joined_at?: string
+          role: string
+          room_id: string
+        }
+        Update: {
+          device_id?: string
+          id?: string
+          joined_at?: string
+          role?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_participants_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "game_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_rooms: {
+        Row: {
+          code: string
+          created_at: string
+          current_word: string | null
+          current_word_index: number
+          dictionary_id: string | null
+          id: string
+          round_number: number
+          score: number
+          status: string
+          timer_running: boolean
+          timer_seconds: number
+          timer_started_at: string | null
+          updated_at: string
+          word_list: Json
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_word?: string | null
+          current_word_index?: number
+          dictionary_id?: string | null
+          id?: string
+          round_number?: number
+          score?: number
+          status?: string
+          timer_running?: boolean
+          timer_seconds?: number
+          timer_started_at?: string | null
+          updated_at?: string
+          word_list?: Json
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_word?: string | null
+          current_word_index?: number
+          dictionary_id?: string | null
+          id?: string
+          round_number?: number
+          score?: number
+          status?: string
+          timer_running?: boolean
+          timer_seconds?: number
+          timer_started_at?: string | null
+          updated_at?: string
+          word_list?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_rooms_dictionary_id_fkey"
+            columns: ["dictionary_id"]
+            isOneToOne: false
+            referencedRelation: "dictionaries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       words: {
         Row: {
           created_at: string
