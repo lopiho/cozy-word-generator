@@ -375,13 +375,76 @@ export default function Admin() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleAiFill(50)}
+                    onClick={() => setShowAiDialog(true)}
                     disabled={aiLoading}
                     className="gap-1"
                   >
                     {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                     AI plnič
                   </Button>
+                  <Dialog open={showAiDialog} onOpenChange={setShowAiDialog}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>🪄 AI plnič slov</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Téma (volitelné)</label>
+                          <Input
+                            placeholder="např. zvířata, sport, kuchyně..."
+                            value={aiTheme}
+                            onChange={e => setAiTheme(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">Necháno prázdné = podle názvu slovníku</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Obtížnost</label>
+                            <select
+                              value={aiDifficulty}
+                              onChange={e => setAiDifficulty(e.target.value as any)}
+                              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                            >
+                              <option value="lehká">Lehká</option>
+                              <option value="střední">Střední</option>
+                              <option value="těžká">Těžká</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Typ slov</label>
+                            <select
+                              value={aiWordType}
+                              onChange={e => setAiWordType(e.target.value as any)}
+                              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                            >
+                              <option value="mix">Mix</option>
+                              <option value="noun">Podst. jména</option>
+                              <option value="verb">Slovesa</option>
+                              <option value="adj">Příd. jména</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Počet slov: {aiCount}</label>
+                          <input
+                            type="range"
+                            min={10}
+                            max={150}
+                            step={10}
+                            value={aiCount}
+                            onChange={e => setAiCount(Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
+                          ✨ AI vygeneruje slova a druhým průchodem ověří jejich vhodnost pro Kufr (vyhodí vlastní jména, abstraktní pojmy, špatné tvary).
+                        </div>
+                        <Button onClick={handleAiFill} disabled={aiLoading} className="w-full game-gradient text-primary-foreground">
+                          {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Wand2 className="w-4 h-4 mr-1" /> Spustit generování</>}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   <Dialog open={showAddWords} onOpenChange={setShowAddWords}>
                     <DialogTrigger asChild>
                       <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Přidat slova</Button>
