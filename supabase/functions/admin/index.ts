@@ -13,7 +13,6 @@ Deno.serve(async (req) => {
   try {
     const { action, password, ...data } = await req.json()
 
-    // Validate password
     const adminPassword = Deno.env.get('ADMIN_PASSWORD')
     if (!password || password !== adminPassword) {
       return new Response(JSON.stringify({ error: 'Neplatné heslo' }), {
@@ -26,6 +25,15 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    async function audit(action: string, entity_type: string, entity_id: string | null, details: Record<string, unknown> = {}) {
+      await supabase.from('audit_log').insert({
+        action,
+        entity_type,
+        entity_id,
+        details,
+      })
+    }
 
     switch (action) {
       case 'verify': {
@@ -47,6 +55,7 @@ Deno.serve(async (req) => {
           .select()
           .single()
         if (error) throw error
+        await audit('create_dictionary', 'dictionary', dict.id, { name })
         return new Response(JSON.stringify(dict), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -66,6 +75,7 @@ Deno.serve(async (req) => {
           .select()
           .single()
         if (error) throw error
+        await audit('update_dictionary', 'dictionary', id, { name, description, icon })
         return new Response(JSON.stringify(dict), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -78,8 +88,11 @@ Deno.serve(async (req) => {
             status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })
         }
+        // Get name for audit
+        const { data: existing } = await supabase.from('dictionaries').select('name').eq('id', id).single()
         const { error } = await supabase.from('dictionaries').delete().eq('id', id)
         if (error) throw error
+        await audit('delete_dictionary', 'dictionary', id, { name: existing?.name })
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -101,7 +114,24 @@ Deno.serve(async (req) => {
         }
         const { error } = await supabase.from('words').insert(rows)
         if (error) throw error
+        await audit('add_words', 'word', dictionary_id, { count: rows.length, sample: rows.slice(0, 5).map(r => r.word) })
         return new Response(JSON.stringify({ success: true, count: rows.length }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      case 'update_word': {
+        const { id, word } = data
+        if (!id || !word || typeof word !== 'string' || word.trim().length === 0 || word.length > 255) {
+          return new Response(JSON.stringify({ error: 'Neplatná data' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+        const { data: oldWord } = await supabase.from('words').select('word').eq('id', id).single()
+        const { error } = await supabase.from('words').update({ word: word.trim() }).eq('id', id)
+        if (error) throw error
+        await audit('update_word', 'word', id, { old: oldWord?.word, new: word.trim() })
+        return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
@@ -113,8 +143,10 @@ Deno.serve(async (req) => {
             status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })
         }
+        const { data: existing } = await supabase.from('words').select('word').eq('id', id).single()
         const { error } = await supabase.from('words').delete().eq('id', id)
         if (error) throw error
+        await audit('delete_word', 'word', id, { word: existing?.word })
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -129,13 +161,13 @@ Deno.serve(async (req) => {
         }
         const { error } = await supabase.from('words').delete().in('id', ids)
         if (error) throw error
+        await audit('delete_words_bulk', 'word', null, { count: ids.length })
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
       case 'seed_defaults': {
-        // Seed default dictionaries and words from provided data
         const { dictionaries: dicts } = data
         if (!Array.isArray(dicts)) {
           return new Response(JSON.stringify({ error: 'Neplatná data' }), {
@@ -150,7 +182,6 @@ Deno.serve(async (req) => {
             .single()
           if (dictError) throw dictError
           if (d.words && d.words.length > 0) {
-            // Insert in batches of 500
             for (let i = 0; i < d.words.length; i += 500) {
               const batch = d.words.slice(i, i + 500).map((w: string) => ({
                 word: w.trim(),
@@ -160,6 +191,7 @@ Deno.serve(async (req) => {
               if (wordError) throw wordError
             }
           }
+          await audit('seed_defaults', 'dictionary', dict.id, { name: d.name, wordCount: d.words?.length || 0 })
         }
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
